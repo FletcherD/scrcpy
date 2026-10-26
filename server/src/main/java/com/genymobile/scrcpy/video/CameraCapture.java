@@ -16,7 +16,9 @@ import com.genymobile.scrcpy.wrappers.ServiceManager;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.graphics.ImageFormat;
 import android.graphics.Rect;
+import android.hardware.HardwareBuffer;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -28,6 +30,8 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.OutputConfiguration;
 import android.hardware.camera2.params.SessionConfiguration;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.Image;
+import android.media.ImageReader;
 import android.media.MediaCodec;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -35,8 +39,8 @@ import android.util.Range;
 import android.view.Surface;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -62,6 +66,7 @@ public class CameraCapture extends SurfaceCapture {
     private final CameraAspectRatio aspectRatio;
     private final int fps;
     private final boolean highSpeed;
+    private final int sessionMode;
     private final Rect crop;
     private final Orientation captureOrientation;
     private final float angle;
@@ -82,6 +87,7 @@ public class CameraCapture extends SurfaceCapture {
     private Handler cameraHandler;
     private CameraDevice cameraDevice;
     private Executor cameraExecutor;
+    private ImageReader previewReader;
 
     private final AtomicBoolean disconnected = new AtomicBoolean();
 
@@ -97,6 +103,7 @@ public class CameraCapture extends SurfaceCapture {
         this.aspectRatio = options.getCameraAspectRatio();
         this.fps = options.getCameraFps();
         this.highSpeed = options.getCameraHighSpeed();
+        this.sessionMode = options.getCameraSessionMode();
         this.crop = options.getCrop();
         this.captureOrientation = options.getCaptureOrientation();
         assert captureOrientation != null;
@@ -290,9 +297,29 @@ public class CameraCapture extends SurfaceCapture {
         });
 
         Surface captureSurface = surface;
-        OutputConfiguration outputConfig = new OutputConfiguration(captureSurface);
-        List<OutputConfiguration> outputs = Collections.singletonList(outputConfig);
-        int sessionType = highSpeed ? SessionConfiguration.SESSION_HIGH_SPEED : SessionConfiguration.SESSION_REGULAR;
+        List<OutputConfiguration> outputs = new ArrayList<>();
+        int sessionType;
+        Surface previewSurface;
+        if (sessionMode >= 0) {
+            Ln.i("Using camera session mode: 0x" + Integer.toHexString(sessionMode));
+            sessionType = sessionMode;
+            // Some vendor implementations select their full processing pipeline only if a preview stream is present, declared before the
+            // video stream. Its frames are discarded.
+            previewReader = ImageReader.newInstance(captureSize.getWidth(), captureSize.getHeight(), ImageFormat.PRIVATE, 4,
+                    HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE);
+            previewReader.setOnImageAvailableListener(reader -> {
+                Image image = reader.acquireLatestImage();
+                if (image != null) {
+                    image.close();
+                }
+            }, cameraHandler);
+            previewSurface = previewReader.getSurface();
+            outputs.add(new OutputConfiguration(previewSurface));
+        } else {
+            sessionType = highSpeed ? SessionConfiguration.SESSION_HIGH_SPEED : SessionConfiguration.SESSION_REGULAR;
+            previewSurface = null;
+        }
+        outputs.add(new OutputConfiguration(captureSurface));
         SessionConfiguration sessionConfig = new SessionConfiguration(sessionType, outputs, cameraExecutor, new CameraCaptureSession.StateCallback() {
             @Override
             public void onConfigured(CameraCaptureSession session) {
@@ -313,6 +340,9 @@ public class CameraCapture extends SurfaceCapture {
                 try {
                     requestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
                     requestBuilder.addTarget(captureSurface);
+                    if (previewSurface != null) {
+                        requestBuilder.addTarget(previewSurface);
+                    }
 
                     if (fps > 0) {
                         requestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, new Range<>(fps, fps));
@@ -355,6 +385,8 @@ public class CameraCapture extends SurfaceCapture {
 
     @Override
     public void stop() {
+        ImageReader reader = previewReader;
+        previewReader = null;
         cameraHandler.post(() -> {
             assertCameraThread();
             if (currentSession != null) {
@@ -368,6 +400,9 @@ public class CameraCapture extends SurfaceCapture {
             currentSession = null;
             requestBuilder = null;
             started = false;
+            if (reader != null) {
+                reader.close();
+            }
         });
 
         if (glRunner != null) {
@@ -463,7 +498,7 @@ public class CameraCapture extends SurfaceCapture {
             }
         };
 
-        if (highSpeed) {
+        if (session instanceof CameraConstrainedHighSpeedCaptureSession) {
             CameraConstrainedHighSpeedCaptureSession highSpeedSession = (CameraConstrainedHighSpeedCaptureSession) session;
             List<CaptureRequest> requests = highSpeedSession.createHighSpeedRequestList(request);
             highSpeedSession.setRepeatingBurst(requests, callback, cameraHandler);

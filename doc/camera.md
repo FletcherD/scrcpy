@@ -146,6 +146,25 @@ scrcpy --video-source=camera --camera-size=1920x1080 --camera-high-speed --camer
 
 [high speed]: https://developer.android.com/reference/android/hardware/camera2/CameraConstrainedHighSpeedCaptureSession
 
+### Vendor session mode
+
+On some devices, the high speed capture mode uses a reduced image processing
+pipeline (for example without chroma noise reduction), so the video is
+noticeably noisier than a slow-motion video recorded by the stock camera app.
+
+The stock camera app may instead use a vendor-specific session type (operating
+mode), with both a preview stream and a video stream. To do the same, pass
+`--camera-session-mode` (instead of `--camera-high-speed`). This also adds a
+preview stream, whose frames are discarded:
+
+```bash
+# ASUS ROG Phone 5
+scrcpy --video-source=camera --camera-id=2 --camera-size=1920x1080 --camera-fps=120 --camera-session-mode=0x8801
+```
+
+Supported values are device-specific. The value used by the stock camera app
+may be found in `adb logcat` while it records (look for `operationMode`).
+
 
 ## Brace expansion tip
 

@@ -18,6 +18,7 @@ _scrcpy() {
         --camera-facing=
         --camera-fps=
         --camera-high-speed
+        --camera-session-mode=
         --camera-size=
         --camera-torch
         --camera-zoom=
@@ -220,6 +221,7 @@ _scrcpy() {
         |--camera-ar \
         |--camera-id \
         |--camera-fps \
+        |--camera-session-mode \
         |--camera-size \
         |--camera-torch \
         |--camera-zoom \

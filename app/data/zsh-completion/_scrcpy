@@ -25,6 +25,7 @@ arguments=(
     '--camera-id=[Specify the camera id to mirror]'
     '--camera-facing=[Select the device camera by its facing direction]:facing:(front back external)'
     '--camera-fps=[Specify the camera capture frame rate]'
+    '--camera-session-mode=[Use a vendor-specific camera session type]'
     '--camera-size=[Specify an explicit camera capture size]'
     '--camera-torch[Turn on the camera torch when the camera starts]'
     '--camera-zoom[Specify the camera zoom initial value]'

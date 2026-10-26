@@ -134,6 +134,14 @@ Specify the device camera id to mirror.
 The available camera ids can be listed by \fB\-\-list\-cameras\fR.
 
 .TP
+.BI "\-\-camera\-session\-mode " value
+Open the camera capture session with a vendor-specific session type (operating mode), in decimal or hexadecimal (e.g. 0x8801), and add a preview output stream (whose frames are discarded) alongside the video stream.
+
+Some devices only enable their full image processing pipeline (including noise reduction) in such a configuration. For example, on ASUS ROG Phone 5, use 0x8801 with \-\-camera\-fps=120 to get the processing of the stock camera app slow-motion mode.
+
+Supported values are device-specific.
+
+.TP
 .BI "\-\-camera\-size " width\fRx\fIheight
 Specify an explicit camera capture size.
 

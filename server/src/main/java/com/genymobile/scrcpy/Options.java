@@ -48,6 +48,7 @@ public class Options {
     private float cameraZoom = 1;
     private int cameraFps;
     private boolean cameraHighSpeed;
+    private int cameraSessionMode = -1; // vendor-specific session type, negative if unset
     private boolean cameraTorch;
     private boolean showTouches;
     private boolean stayAwake;
@@ -189,6 +190,10 @@ public class Options {
 
     public boolean getCameraHighSpeed() {
         return cameraHighSpeed;
+    }
+
+    public int getCameraSessionMode() {
+        return cameraSessionMode;
     }
 
     public boolean getCameraTorch() {
@@ -517,6 +522,15 @@ public class Options {
                     break;
                 case "camera_high_speed":
                     options.cameraHighSpeed = Boolean.parseBoolean(value);
+                    break;
+                case "camera_session_mode":
+                    if (!value.isEmpty()) {
+                        int mode = Integer.decode(value);
+                        if (mode < 0) {
+                            throw new IllegalArgumentException("Invalid camera session mode: " + value);
+                        }
+                        options.cameraSessionMode = mode;
+                    }
                     break;
                 case "camera_torch":
                     options.cameraTorch = Boolean.parseBoolean(value);

@@ -104,6 +104,7 @@ enum {
     OPT_DISPLAY_IME_POLICY,
     OPT_CAMERA_TORCH,
     OPT_CAMERA_ZOOM,
+    OPT_CAMERA_SESSION_MODE,
     OPT_MIN_SIZE_ALIGNMENT,
     OPT_NO_WINDOW_ASPECT_RATIO_LOCK,
     OPT_KEEP_ACTIVE,
@@ -305,6 +306,21 @@ static const struct sc_option options[] = {
         .text = "Specify the device camera id to mirror.\n"
                 "The available camera ids can be listed by:\n"
                 "    scrcpy --list-cameras",
+    },
+    {
+        .longopt_id = OPT_CAMERA_SESSION_MODE,
+        .longopt = "camera-session-mode",
+        .argdesc = "value",
+        .text = "Open the camera capture session with a vendor-specific "
+                "session type (operating mode), in decimal or hexadecimal "
+                "(e.g. 0x8801), and add a preview output stream (whose frames "
+                "are discarded) alongside the video stream.\n"
+                "Some devices only enable their full image processing "
+                "pipeline (including noise reduction) in such a "
+                "configuration. For example, on ASUS ROG Phone 5, use 0x8801 "
+                "with --camera-fps=120 to get the processing of the stock "
+                "camera app slow-motion mode.\n"
+                "Supported values are device-specific.",
     },
     {
         .longopt_id = OPT_CAMERA_SIZE,
@@ -2933,6 +2949,9 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
             case OPT_CAMERA_ZOOM:
                 opts->camera_zoom = optarg;
                 break;
+            case OPT_CAMERA_SESSION_MODE:
+                opts->camera_session_mode = optarg;
+                break;
             case OPT_NO_WINDOW:
                 opts->window = false;
                 break;
@@ -3322,6 +3341,12 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
             return false;
         }
 
+        if (opts->camera_high_speed && opts->camera_session_mode) {
+            LOGE("Cannot specify both --camera-high-speed and "
+                 "--camera-session-mode");
+            return false;
+        }
+
         if (opts->control) {
             // Disable all inputs for camera
             opts->keyboard_input_mode = SC_KEYBOARD_INPUT_MODE_DISABLED;
@@ -3333,6 +3358,7 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
             || opts->camera_facing != SC_CAMERA_FACING_ANY
             || opts->camera_fps
             || opts->camera_high_speed
+            || opts->camera_session_mode
             || opts->camera_size) {
         LOGE("Camera options are only available with --video-source=camera");
         return false;
